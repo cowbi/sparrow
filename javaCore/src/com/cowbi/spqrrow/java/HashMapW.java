@@ -17,7 +17,12 @@ import java.util.*;
  * （2）resize 从新计算index时
  * （3）hash(key)
  *  (4)tableSizeFor()
- * 2. 线程不安全体现在哪? resize()
+ * 2. 线程不安全体现在哪? put，resize()，删除操作、修改操作，同样都会有覆盖问题。
+ * （1）当线程A和线程B都获取到了bucket的头结点后，若此时线程A的时间片用完，线程B将其新数据完成了头插法操作，此时轮到线程A操作，
+ * 但这时线程A所据有的旧头结点已经过时了（并未包含线程B刚插入的新结点），线程A再做头插法操作，就会抹掉B刚刚新增的结点，导致数据丢失。
+ * （2）resize在1.7及之前版本会导致死循环。1.8顶多一次循环。
+ *  1.7头插法: 线程a和线程b同时扩容，假设它们在相同的bucket上,在a线程完成扩容后（b已经完成put）。所以此时该bucket上的链表是a->b
+ *  当b扩容的时候，就成了b—>a—>b。这时就出现了死循环。a的next指向b，b的next指向a。
  * 3. hashmap数据结构? 数组+链表+红黑树
  * <p>
  * 好的哈希函数会尽可能地保证计算简单和散列地址分布均匀。
@@ -28,9 +33,9 @@ import java.util.*;
  *  哈希表是非线程安全的， 如果多线程同时访问哈希表， 且至少一个线程修改了哈希表的结构，
  *  那么必须在访问hashmap前设置同步锁。（修改结构是指添加或者删除一个或多个entry， 修改键值不算是修改结构。）
  *  一般在多线程操作哈希表时，  要使用同步对象封装map。
- *  如果不封装Hashmap， 可以使用Collections.synchronizedMap  方法调用HashMap实例。
+ *  如果不封装Hashmap， 可以使用Collections.synchronizedMap方法调用HashMap实例。
  *  在创建HashMap实例时避免其他线程操作该实例，即保证了线程安全。
- *  当然也可以直接用使用ConcurrentHashMap
+ *  当然也可以直接用使用ConcurrentHashMap。在jdk1.5之前使用的hashtable。
  *
  * @author zyc
  * @data 2020-11-26
@@ -45,7 +50,7 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
      * 为什么不直接写成16，大师是想用这种写法告诉你只能是2的幂
      * 好比我们给某一缓存设置有效时间是3*60s。而不是直接写180秒。其实我们强调的是前面的3，它代表分钟。
      */
-    static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
+    static final int DEFAULT_INITIAL_CAPACITY = 1 << 4;
 
 
     /**
