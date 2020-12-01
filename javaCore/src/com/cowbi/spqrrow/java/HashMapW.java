@@ -6,7 +6,14 @@ import java.util.*;
 /**
  * 提取jdk1.8.0_201的精华部分进行详解。包括了HashMap关（面）注（试）点。本类并没有实现红黑树
  * 1. hashmap的容量为什么是2的次幂? 答案详情看方法注解
- * （1）计算index时
+ * （1）计算index=hash&(length-1) 相当于hash%length，不仅提高了效率，也保证了散列的均匀。
+ *   既然length是2的n次幂，那它一定是偶数，length-1一定是奇数。二进制低位一定是1。这样hash&(length-1)的尾数可能是0或者1。即是偶数也可能是奇数。
+ *   但是如果length是奇数，那length-1一定是偶数。偶数最后一位一定是0，那hash&(length-1)一定是0。即是偶数。这样任何数都会被分配到偶数的下标位，浪费了奇数下标位。
+ *  因此，length取2的整数次幂，是为了使不同hash值发生碰撞的概率较小，这样就能使元素在哈希表中更均匀地散列。
+ *
+ * 而当数组长度为16时，即为2的n次方时，n-1得到的二进制数的每个位上的值都为1，这使得在低位上&时，得到的和原hash的低位相同（提供既高效又纯粹的取模），
+ * 加之hash(int h)方法对key的hashCode的进一步优化，加入了高位计算，就使得只有相同的hash值的两个值才会被放到数组中的同一个位置上形成链表。
+ *
  * （2）resize 从新计算index时
  * （3）hash(key)
  *  (4)tableSizeFor()
@@ -18,103 +25,12 @@ import java.util.*;
  * 如何解决hash冲突：哈希冲突的解决方案有多种:开放定址法（发生冲突，继续寻找下一块未被占用的存储地址），再散列函数法，链地址法，而HashMap即是采用了链地址法，也就是数组+链表的方式
  *
  *
- *  下面是hashmap原注解。我大概翻译了下，不足之处请多多指正。
- *  * Hash table based implementation of the <tt>Map</tt> interface.  This
- *  * implementation provides all of the optional map operations, and permits
- *  * <tt>null</tt> values and the <tt>null</tt> key.  (The <tt>HashMap</tt>
- *  * class is roughly equivalent to <tt>Hashtable</tt>, except that it is
- *  * unsynchronized and permits nulls.)
- *  *     HashTable实现了Map接口类， 这些接口实现了所有可选的map功能， 包括允许空值和空key。
- *  *     （HashMap和HashTable大致相同，除了HashMap是线程不同步的和允许nulls）
- *
- *  * This class makes no guarantees as to
- *  * the order of the map; in particular, it does not guarantee that the order
- *  * will remain constant over time.
- *  *
- *  * 此类不保证map的顺序，也不保证顺序随着时间的推移保持不变。
- *  *
- *  * <p>This implementation provides constant-time performance for the basic
- *  * operations (<tt>get</tt> and <tt>put</tt>), assuming the hash function
- *  * disperses the elements properly among the buckets.  Iteration over
- *  * collection views requires time proportional to the "capacity" of the
- *  * <tt>HashMap</tt> instance (the number of buckets) plus its size (the number
- *  * of key-value mappings).  Thus, it's very important not to set the initial
- *  * capacity too high (or the load factor too low) if iteration performance is
- *  * important.
- *  *
- *  * <p>An instance of <tt>HashMap</tt> has two parameters that affect its
- *  * performance: <i>initial capacity</i> and <i>load factor</i>.  The
- *  * <i>capacity</i> is the number of buckets in the hash table, and the initial
- *  * capacity is simply the capacity at the time the hash table is created.  The
- *  * <i>load factor</i> is a measure of how full the hash table is allowed to
- *  * get before its capacity is automatically increased.  When the number of
- *  * entries in the hash table exceeds the product of the load factor and the
- *  * current capacity, the hash table is <i>rehashed</i> (that is, internal data
- *  * structures are rebuilt) so that the hash table has approximately twice the
- *  * number of buckets.
- *  *
- *  * <p>As a general rule, the default load factor (.75) offers a good
- *  * tradeoff between time and space costs.  Higher values decrease the
- *  * space overhead but increase the lookup cost (reflected in most of
- *  * the operations of the <tt>HashMap</tt> class, including
- *  * <tt>get</tt> and <tt>put</tt>).  The expected number of entries in
- *  * the map and its load factor should be taken into account when
- *  * setting its initial capacity, so as to minimize the number of
- *  * rehash operations.  If the initial capacity is greater than the
- *  * maximum number of entries divided by the load factor, no rehash
- *  * operations will ever occur.
- *  *
- *  * <p>If many mappings are to be stored in a <tt>HashMap</tt>
- *  * instance, creating it with a sufficiently large capacity will allow
- *  * the mappings to be stored more efficiently than letting it perform
- *  * automatic rehashing as needed to grow the table.  Note that using
- *  * many keys with the same {@code hashCode()} is a sure way to slow
- *  * down performance of any hash table. To ameliorate impact, when keys
- *  * are {@link Comparable}, this class may use comparison order among
- *  * keys to help break ties.
- *  *
- *  * <p><strong>Note that this implementation is not synchronized.</strong>
- *  * If multiple threads access a hash map concurrently, and at least one of
- *  * the threads modifies the map structurally, it <i>must</i> be
- *  * synchronized externally.  (A structural modification is any operation
- *  * that adds or deletes one or more mappings; merely changing the value
- *  * associated with a key that an instance already contains is not a
- *  * structural modification.)  This is typically accomplished by
- *  * synchronizing on some object that naturally encapsulates the map.
- *  *
- *  * If no such object exists, the map should be "wrapped" using the
- *  * {@link Collections#synchronizedMap Collections.synchronizedMap}
- *  * method.  This is best done at creation time, to prevent accidental
- *  * unsynchronized access to the map:<pre>
- *  *   Map m = Collections.synchronizedMap(new HashMap(...));</pre>
- *  *
- *  * <p>The iterators returned by all of this class's "collection view methods"
- *  * are <i>fail-fast</i>: if the map is structurally modified at any time after
- *  * the iterator is created, in any way except through the iterator's own
- *  * <tt>remove</tt> method, the iterator will throw a
- *  * {@link ConcurrentModificationException}.  Thus, in the face of concurrent
- *  * modification, the iterator fails quickly and cleanly, rather than risking
- *  * arbitrary, non-deterministic behavior at an undetermined time in the
- *  * future.
- *  *
- *  * <p>Note that the fail-fast behavior of an iterator cannot be guaranteed
- *  * as it is, generally speaking, impossible to make any hard guarantees in the
- *  * presence of unsynchronized concurrent modification.  Fail-fast iterators
- *  * throw <tt>ConcurrentModificationException</tt> on a best-effort basis.
- *  * Therefore, it would be wrong to write a program that depended on this
- *  * exception for its correctness: <i>the fail-fast behavior of iterators
- *  * should be used only to detect bugs.</i>
- *  *
- *  * <p>This class is a member of the
- *  * <a href="{@docRoot}/../technotes/guides/collections/index.html">
- *  * Java Collections Framework</a>.
- *  *
- *  * @param <K> the type of keys maintained by this map
- *  * @param <V> the type of mapped values
- *
- *  translate cn
- *
- *
+ *  哈希表是非线程安全的， 如果多线程同时访问哈希表， 且至少一个线程修改了哈希表的结构，
+ *  那么必须在访问hashmap前设置同步锁。（修改结构是指添加或者删除一个或多个entry， 修改键值不算是修改结构。）
+ *  一般在多线程操作哈希表时，  要使用同步对象封装map。
+ *  如果不封装Hashmap， 可以使用Collections.synchronizedMap  方法调用HashMap实例。
+ *  在创建HashMap实例时避免其他线程操作该实例，即保证了线程安全。
+ *  当然也可以直接用使用ConcurrentHashMap
  *
  * @author zyc
  * @data 2020-11-26
@@ -126,6 +42,8 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
     /**
      * The default initial capacity - MUST be a power of two.
      * 数组的初始化容量，必须是2的n次幂，默认16。
+     * 为什么不直接写成16，大师是想用这种写法告诉你只能是2的幂
+     * 好比我们给某一缓存设置有效时间是3*60s。而不是直接写180秒。其实我们强调的是前面的3，它代表分钟。
      */
     static final int DEFAULT_INITIAL_CAPACITY = 1 << 4; // aka 16
 
