@@ -1,41 +1,44 @@
-package com.cowbi.spqrrow.java;
+package com.cowbi.spqrrow.java.hashmap;
 
 import java.io.Serializable;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 
 /**
  * 提取jdk1.8.0_201的精华部分进行详解。包括了HashMap关（面）注（试）点。本类并没有实现红黑树
- * 1. hashmap的容量为什么是2的次幂? 答案详情看方法注解
+ * 1. hashmap的容量为什么是2的幂次方数? 答案详情看方法注解
  * （1）计算index=hash&(length-1) 相当于hash%length，不仅提高了效率，也保证了散列的均匀。
- *   既然length是2的n次幂，那它一定是偶数，length-1一定是奇数。二进制低位一定是1。这样hash&(length-1)的尾数可能是0或者1。即是偶数也可能是奇数。
- *   但是如果length是奇数，那length-1一定是偶数。偶数最后一位一定是0，那hash&(length-1)一定是0。即是偶数。这样任何数都会被分配到偶数的下标位，浪费了奇数下标位。
- *  因此，length取2的整数次幂，是为了使不同hash值发生碰撞的概率较小，这样就能使元素在哈希表中更均匀地散列。
- *
+ * 既然length是2的n次幂，那它一定是偶数，length-1一定是奇数。二进制低位一定是1。这样hash&(length-1)的尾数可能是0或者1。即是偶数也可能是奇数。
+ * 但是如果length是奇数，那length-1一定是偶数。偶数最后一位一定是0，那hash&(length-1)一定是0。即是偶数。这样任何数都会被分配到偶数的下标位，浪费了奇数下标位。
+ * 因此，length取2的整数次幂，是为了使不同hash值发生碰撞的概率较小，这样就能使元素在哈希表中更均匀地散列。
+ * <p>
  * 而当数组长度为16时，即为2的n次方时，n-1得到的二进制数的每个位上的值都为1，这使得在低位上&时，得到的和原hash的低位相同（提供既高效又纯粹的取模），
  * 加之hash(int h)方法对key的hashCode的进一步优化，加入了高位计算，就使得只有相同的hash值的两个值才会被放到数组中的同一个位置上形成链表。
- *
+ * <p>
  * （2）resize 从新计算index时
  * （3）hash(key)
- *  (4)tableSizeFor()
+ * (4)tableSizeFor()
  * 2. 线程不安全体现在哪? put，resize()，删除操作、修改操作，同样都会有覆盖问题。
  * （1）当线程A和线程B都获取到了bucket的头结点后，若此时线程A的时间片用完，线程B将其新数据完成了头插法操作，此时轮到线程A操作，
  * 但这时线程A所据有的旧头结点已经过时了（并未包含线程B刚插入的新结点），线程A再做头插法操作，就会抹掉B刚刚新增的结点，导致数据丢失。
  * （2）resize在1.7及之前版本会导致死循环。1.8顶多一次循环。
- *  1.7头插法: 线程a和线程b同时扩容，假设它们在相同的bucket上,在a线程完成扩容后（b已经完成put）。所以此时该bucket上的链表是a->b
- *  当b扩容的时候，就成了b—>a—>b。这时就出现了死循环。a的next指向b，b的next指向a。
+ * 1.7头插法: 线程a和线程b同时扩容，假设它们在相同的bucket上,在a线程完成扩容后（b已经完成put）。所以此时该bucket上的链表是a->b
+ * 当b扩容的时候，就成了b—>a—>b。这时就出现了死循环。a的next指向b，b的next指向a。
+ * 在get的是就会报错：Infinite Loop
  * 3. hashmap数据结构? 数组+链表+红黑树
  * <p>
  * 好的哈希函数会尽可能地保证计算简单和散列地址分布均匀。
  * 但是，数组是一块连续的固定长度的内存空间，再好的哈希函数也不能保证得到的存储地址绝对不发生冲突。
  * 如何解决hash冲突：哈希冲突的解决方案有多种:开放定址法（发生冲突，继续寻找下一块未被占用的存储地址），再散列函数法，链地址法，而HashMap即是采用了链地址法，也就是数组+链表的方式
- *
- *
- *  哈希表是非线程安全的， 如果多线程同时访问哈希表， 且至少一个线程修改了哈希表的结构，
- *  那么必须在访问hashmap前设置同步锁。（修改结构是指添加或者删除一个或多个entry， 修改键值不算是修改结构。）
- *  一般在多线程操作哈希表时，  要使用同步对象封装map。
- *  如果不封装Hashmap， 可以使用Collections.synchronizedMap方法调用HashMap实例。
- *  在创建HashMap实例时避免其他线程操作该实例，即保证了线程安全。
- *  当然也可以直接用使用ConcurrentHashMap。在jdk1.5之前使用的hashtable。
+ * <p>
+ * <p>
+ * 哈希表是非线程安全的， 如果多线程同时访问哈希表， 且至少一个线程修改了哈希表的结构，
+ * 那么必须在访问hashmap前设置同步锁。（修改结构是指添加或者删除一个或多个entry， 修改键值不算是修改结构。）
+ * 一般在多线程操作哈希表时，  要使用同步对象封装map。
+ * 如果不封装Hashmap， 可以使用Collections.synchronizedMap方法调用HashMap实例。
+ * 在创建HashMap实例时避免其他线程操作该实例，即保证了线程安全。
+ * 当然也可以直接用使用ConcurrentHashMap。在jdk1.5之前使用的hashtable。
  *
  * @author zyc
  * @data 2020-11-26
@@ -44,18 +47,112 @@ import java.util.*;
 public class HashMapW<K, V> extends AbstractMap<K, V>
         implements Map<K, V>, Cloneable, Serializable {
 
+    private static final long serialVersionUID = 2586712385947688968L;
+
+    /*
+     * Implementation notes.
+     *
+     * This map usually acts as a binned (bucketed) hash table, but
+     * when bins get too large, they are transformed into bins of
+     * TreeNodes, each structured similarly to those in
+     * java.util.TreeMap. Most methods try to use normal bins, but
+     * relay to TreeNode methods when applicable (simply by checking
+     * instanceof a node).  Bins of TreeNodes may be traversed and
+     * used like any others, but additionally support faster lookup
+     * when overpopulated. However, since the vast majority of bins in
+     * normal use are not overpopulated, checking for existence of
+     * tree bins may be delayed in the course of table methods.
+     *
+     * Tree bins (i.e., bins whose elements are all TreeNodes) are
+     * ordered primarily by hashCode, but in the case of ties, if two
+     * elements are of the same "class C implements Comparable<C>",
+     * type then their compareTo method is used for ordering. (We
+     * conservatively check generic types via reflection to validate
+     * this -- see method comparableClassFor).  The added complexity
+     * of tree bins is worthwhile in providing worst-case O(log n)
+     * operations when keys either have distinct hashes or are
+     * orderable, Thus, performance degrades gracefully under
+     * accidental or malicious usages in which hashCode() methods
+     * return values that are poorly distributed, as well as those in
+     * which many keys share a hashCode, so long as they are also
+     * Comparable. (If neither of these apply, we may waste about a
+     * factor of two in time and space compared to taking no
+     * precautions. But the only known cases stem from poor user
+     * programming practices that are already so slow that this makes
+     * little difference.)
+     *
+     * Because TreeNodes are about twice the size of regular nodes, we
+     * use them only when bins contain enough nodes to warrant use
+     * (see TREEIFY_THRESHOLD). And when they become too small (due to
+     * removal or resizing) they are converted back to plain bins.  In
+     * usages with well-distributed user hashCodes, tree bins are
+     * rarely used.  Ideally, under random hashCodes, the frequency of
+     * nodes in bins follows a Poisson distribution
+     * (http://en.wikipedia.org/wiki/Poisson_distribution) with a
+     * parameter of about 0.5 on average for the default resizing
+     * threshold of 0.75, although with a large variance because of
+     * resizing granularity. Ignoring variance, the expected
+     * occurrences of list size k are (exp(-0.5) * pow(0.5, k) /
+     * factorial(k)). The first values are:
+     *
+     * 0:    0.60653066
+     * 1:    0.30326533
+     * 2:    0.07581633
+     * 3:    0.01263606
+     * 4:    0.00157952
+     * 5:    0.00015795
+     * 6:    0.00001316
+     * 7:    0.00000094
+     * 8:    0.00000006
+     * more: less than 1 in ten million
+     *
+     * 到8个的时候，概率已经很低。没必要再多，泊松分布。
+     *
+     * The root of a tree bin is normally its first node.  However,
+     * sometimes (currently only upon Iterator.remove), the root might
+     * be elsewhere, but can be recovered following parent links
+     * (method TreeNode.root()).
+     *
+     * All applicable internal methods accept a hash code as an
+     * argument (as normally supplied from a public method), allowing
+     * them to call each other without recomputing user hashCodes.
+     * Most internal methods also accept a "tab" argument, that is
+     * normally the current table, but may be a new or old one when
+     * resizing or converting.
+     *
+     * When bin lists are treeified, split, or untreeified, we keep
+     * them in the same relative access/traversal order (i.e., field
+     * Node.next) to better preserve locality, and to slightly
+     * simplify handling of splits and traversals that invoke
+     * iterator.remove. When using comparators on insertion, to keep a
+     * total ordering (or as close as is required here) across
+     * rebalancings, we compare classes and identityHashCodes as
+     * tie-breakers.
+     *
+     * The use and transitions among plain vs tree modes is
+     * complicated by the existence of subclass LinkedHashMap. See
+     * below for hook methods defined to be invoked upon insertion,
+     * removal and access that allow LinkedHashMap internals to
+     * otherwise remain independent of these mechanics. (This also
+     * requires that a map instance be passed to some utility methods
+     * that may create new nodes.)
+     *
+     * The concurrent-programming-like SSA-based coding style helps
+     * avoid aliasing errors amid all of the twisty pointer operations.
+     */
+
     /**
      * The default initial capacity - MUST be a power of two.
      * 数组的初始化容量，必须是2的n次幂，默认16。
-     * 为什么不直接写成16，大师是想用这种写法告诉你只能是2的幂
-     * 好比我们给某一缓存设置有效时间是3*60s。而不是直接写180秒。其实我们强调的是前面的3，它代表分钟。
+     * 为什么不直接写16。鄙人猜测是，可能大师要告诉我们HashMap的容量必须是2的幂次方。
+     * 好比我们给某一缓存设置有效时间是3*60s。而不是直接写180秒。其实我们强调的是前面的3分钟。
      */
     static final int DEFAULT_INITIAL_CAPACITY = 1 << 4;
 
 
     /**
      * The load factor used when none specified in constructor.
-     * 负载因子默认值0.75f
+     * 负载因子的默认值
      */
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
@@ -96,6 +193,14 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
     transient int modCount;
 
     /**
+     * The bin count threshold for untreeifying a (split) bin during a
+     * resize operation. Should be less than TREEIFY_THRESHOLD, and at
+     * most 6 to mesh with shrinkage detection under removal.
+     * 扩容时，如果bucket的node数量小于UNTREEIFY_THRESHOLD，红黑树转为单向链表
+     */
+    static final int UNTREEIFY_THRESHOLD = 6;
+
+    /**
      * The bin count threshold for using a tree rather than list for a
      * bin.  Bins are converted to trees when adding an element to a
      * bin with at least this many nodes. The value must be greater
@@ -103,7 +208,7 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
      * tree removal about conversion back to plain bins upon
      * shrinkage.
      * <p>
-     * 链表转红黑树的阀值
+     * 链表转红黑树的阀值。
      */
     static final int TREEIFY_THRESHOLD = 8;
 
@@ -114,7 +219,7 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
      * The next size value at which to resize (capacity * load factor).
      * <p>
      * <p>
-     * 扩容的临界值，或者所能容纳的key-value对的极限。当size>threshold（=capacity * load factor）的时候就会扩容
+     * 扩容的阀值。当size>threshold（=capacity * load factor）的时候就会扩容
      *
      * @serial
      */
@@ -131,6 +236,12 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
      * 在首次用的时候初始化，类似于“懒加载”，用的时候再初始化，这样有利于节省资源
      */
     transient Node<K, V>[] table;
+
+    // For conversion from TreeNodes to plain nodes
+    Node<K, V> replacementNode(Node<K, V> p, Node<K, V> next) {
+        return new Node<>(p.hash, p.key, p.value, next);
+    }
+
 
     /**
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
@@ -254,7 +365,6 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
         /**
          * 2. 计算i值，也就是数组下标
          * (n - 1)&hash 在n为2的次幂的时候等价于 hash%n，但是要比hash%n效率高。
-         * 为什么他俩等价，去看文章 todo
          * 这也是为什么capacity必须为2的次幂的一个原因
          * */
         i = (n - 1) & hash;
@@ -327,9 +437,9 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
      * to incorporate impact of the highest bits that would otherwise
      * never be used in index calculations because of table bounds.
      * <p>
+     * 扰动函数
      * 右位移16位，正好是32bit的一半，自己的高半区和低半区做异或，就是为了混合原始哈希码的高位和低位，以此来加大低位的随机性。
      * 而且混合后的低位掺杂了高位的部分特征，这样高位的信息也被变相保留下来。
-     *
      */
     static final int hash(Object key) {
         int h;
@@ -398,6 +508,7 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
                     } else if (e instanceof TreeNode) {//红黑树处理，本类并未实现
                         ((TreeNode<K, V>) e).split(null, newTab, j, oldCap);
                     } else { // preserve order 链表优化重hash的代码块
+                        //英语lo=low hi=high
                         Node<K, V> loHead = null, loTail = null;
                         Node<K, V> hiHead = null, hiTail = null;
                         Node<K, V> next;
@@ -519,6 +630,31 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
         }
 
         /**
+         * Ensures that the given root is the first node of its bin.
+         */
+        static <K, V> void moveRootToFront(Node<K, V>[] tab, TreeNode<K, V> root) {
+            int n;
+            if (root != null && tab != null && (n = tab.length) > 0) {
+                int index = (n - 1) & root.hash;
+                TreeNode<K, V> first = (TreeNode<K, V>) tab[index];
+                if (root != first) {
+                    Node<K, V> rn;
+                    tab[index] = root;
+                    TreeNode<K, V> rp = root.prev;
+                    if ((rn = root.next) != null)
+                        ((TreeNode<K, V>) rn).prev = rp;
+                    if (rp != null)
+                        rp.next = rn;
+                    if (first != null)
+                        first.prev = root;
+                    root.next = first;
+                    root.prev = null;
+                }
+                assert checkInvariants(root);
+            }
+        }
+
+        /**
          * Splits nodes in a tree bin into lower and upper tree bins,
          * or untreeifies if now too small. Called only from resize;
          * see above discussion about split bits and indices.
@@ -528,10 +664,287 @@ public class HashMapW<K, V> extends AbstractMap<K, V>
          * @param index the index of the table being split
          * @param bit   the bit of hash to split on
          */
-        final void split(HashMap<K, V> map, Node<K, V>[] tab, int index, int bit) {
+        final void split(HashMapW<K, V> map, Node<K, V>[] tab, int index, int bit) {
+            TreeNode<K, V> b = this;
+            // Relink into lo and hi lists, preserving order
+            TreeNode<K, V> loHead = null, loTail = null;
+            TreeNode<K, V> hiHead = null, hiTail = null;
+            int lc = 0, hc = 0;
+            for (TreeNode<K, V> e = b, next; e != null; e = next) {
+                next = (TreeNode<K, V>) e.next;
+                e.next = null;
+                if ((e.hash & bit) == 0) {
+                    if ((e.prev = loTail) == null)
+                        loHead = e;
+                    else
+                        loTail.next = e;
+                    loTail = e;
+                    ++lc;
+                } else {
+                    if ((e.prev = hiTail) == null)
+                        hiHead = e;
+                    else
+                        hiTail.next = e;
+                    hiTail = e;
+                    ++hc;
+                }
+            }
 
+            //低位元素小于6，树形结构转成单向链表
+            if (loHead != null) {
+                if (lc <= UNTREEIFY_THRESHOLD)
+                    tab[index] = loHead.untreeify(map);
+                else {
+                    tab[index] = loHead;
+                    if (hiHead != null) // (else is already treeified)
+                        loHead.treeify(tab);
+                }
+            }
+            if (hiHead != null) {
+                if (hc <= UNTREEIFY_THRESHOLD)
+                    tab[index + bit] = hiHead.untreeify(map);
+                else {
+                    tab[index + bit] = hiHead;
+                    if (loHead != null)
+                        hiHead.treeify(tab);
+                }
+            }
         }
+
+        /**
+         * Forms tree of the nodes linked from this node.
+         */
+        final void treeify(Node<K, V>[] tab) {
+            TreeNode<K, V> root = null;
+            for (TreeNode<K, V> x = this, next; x != null; x = next) {
+                next = (TreeNode<K, V>) x.next;
+                x.left = x.right = null;
+                if (root == null) {
+                    x.parent = null;
+                    x.red = false;
+                    root = x;
+                } else {
+                    K k = x.key;
+                    int h = x.hash;
+                    Class<?> kc = null;
+                    for (TreeNode<K, V> p = root; ; ) {
+                        int dir, ph;
+                        K pk = p.key;
+                        if ((ph = p.hash) > h)
+                            dir = -1;
+                        else if (ph < h)
+                            dir = 1;
+                        else if ((kc == null &&
+                                (kc = comparableClassFor(k)) == null) ||
+                                (dir = compareComparables(kc, k, pk)) == 0)
+                            dir = tieBreakOrder(k, pk);
+
+                        TreeNode<K, V> xp = p;
+                        if ((p = (dir <= 0) ? p.left : p.right) == null) {
+                            x.parent = xp;
+                            if (dir <= 0)
+                                xp.left = x;
+                            else
+                                xp.right = x;
+                            root = balanceInsertion(root, x);
+                            break;
+                        }
+                    }
+                }
+            }
+            moveRootToFront(tab, root);
+        }
+
+        /**
+         * Recursive invariant check
+         */
+        static <K, V> boolean checkInvariants(TreeNode<K, V> t) {
+            TreeNode<K, V> tp = t.parent, tl = t.left, tr = t.right,
+                    tb = t.prev, tn = (TreeNode<K, V>) t.next;
+            if (tb != null && tb.next != t)
+                return false;
+            if (tn != null && tn.prev != t)
+                return false;
+            if (tp != null && t != tp.left && t != tp.right)
+                return false;
+            if (tl != null && (tl.parent != t || tl.hash > t.hash))
+                return false;
+            if (tr != null && (tr.parent != t || tr.hash < t.hash))
+                return false;
+            if (t.red && tl != null && tl.red && tr != null && tr.red)
+                return false;
+            if (tl != null && !checkInvariants(tl))
+                return false;
+            if (tr != null && !checkInvariants(tr))
+                return false;
+            return true;
+        }
+
+        /**
+         * Tie-breaking utility for ordering insertions when equal
+         * hashCodes and non-comparable. We don't require a total
+         * order, just a consistent insertion rule to maintain
+         * equivalence across rebalancings. Tie-breaking further than
+         * necessary simplifies testing a bit.
+         */
+        static int tieBreakOrder(Object a, Object b) {
+            int d;
+            if (a == null || b == null ||
+                    (d = a.getClass().getName().
+                            compareTo(b.getClass().getName())) == 0)
+                d = (System.identityHashCode(a) <= System.identityHashCode(b) ?
+                        -1 : 1);
+            return d;
+        }
+
+        /**
+         * Returns a list of non-TreeNodes replacing those linked from
+         * this node.
+         * <p>
+         * 把原来的树形结构变成单向列表
+         */
+        final Node<K, V> untreeify(HashMapW<K, V> map) {
+            Node<K, V> hd = null, tl = null;
+            for (Node<K, V> q = this; q != null; q = q.next) {
+                Node<K, V> p = map.replacementNode(q, null);
+                if (tl == null)
+                    hd = p;
+                else
+                    tl.next = p;
+                tl = p;
+            }
+            return hd;
+        }
+
+        static <K, V> TreeNode<K, V> balanceInsertion(TreeNode<K, V> root,
+                                                      TreeNode<K, V> x) {
+            x.red = true;
+            for (TreeNode<K, V> xp, xpp, xppl, xppr; ; ) {
+                if ((xp = x.parent) == null) {
+                    x.red = false;
+                    return x;
+                } else if (!xp.red || (xpp = xp.parent) == null)
+                    return root;
+                if (xp == (xppl = xpp.left)) {
+                    if ((xppr = xpp.right) != null && xppr.red) {
+                        xppr.red = false;
+                        xp.red = false;
+                        xpp.red = true;
+                        x = xpp;
+                    } else {
+                        if (x == xp.right) {
+                            root = rotateLeft(root, x = xp);
+                            xpp = (xp = x.parent) == null ? null : xp.parent;
+                        }
+                        if (xp != null) {
+                            xp.red = false;
+                            if (xpp != null) {
+                                xpp.red = true;
+                                root = rotateRight(root, xpp);
+                            }
+                        }
+                    }
+                } else {
+                    if (xppl != null && xppl.red) {
+                        xppl.red = false;
+                        xp.red = false;
+                        xpp.red = true;
+                        x = xpp;
+                    } else {
+                        if (x == xp.left) {
+                            root = rotateRight(root, x = xp);
+                            xpp = (xp = x.parent) == null ? null : xp.parent;
+                        }
+                        if (xp != null) {
+                            xp.red = false;
+                            if (xpp != null) {
+                                xpp.red = true;
+                                root = rotateLeft(root, xpp);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        /* ------------------------------------------------------------ */
+        // Red-black tree methods, all adapted from CLR
+
+        static <K, V> TreeNode<K, V> rotateLeft(TreeNode<K, V> root,
+                                                TreeNode<K, V> p) {
+            TreeNode<K, V> r, pp, rl;
+            if (p != null && (r = p.right) != null) {
+                if ((rl = p.right = r.left) != null)
+                    rl.parent = p;
+                if ((pp = r.parent = p.parent) == null)
+                    (root = r).red = false;
+                else if (pp.left == p)
+                    pp.left = r;
+                else
+                    pp.right = r;
+                r.left = p;
+                p.parent = r;
+            }
+            return root;
+        }
+
+        static <K, V> TreeNode<K, V> rotateRight(TreeNode<K, V> root,
+                                                 TreeNode<K, V> p) {
+            TreeNode<K, V> l, pp, lr;
+            if (p != null && (l = p.left) != null) {
+                if ((lr = p.left = l.right) != null)
+                    lr.parent = p;
+                if ((pp = l.parent = p.parent) == null)
+                    (root = l).red = false;
+                else if (pp.right == p)
+                    pp.right = l;
+                else
+                    pp.left = l;
+                l.right = p;
+                p.parent = l;
+            }
+            return root;
+        }
+
     }
+
+    /**
+     * Returns x's Class if it is of the form "class C implements
+     * Comparable<C>", else null.
+     */
+    static Class<?> comparableClassFor(Object x) {
+        if (x instanceof Comparable) {
+            Class<?> c;
+            Type[] ts, as;
+            Type t;
+            ParameterizedType p;
+            if ((c = x.getClass()) == String.class) // bypass checks
+                return c;
+            if ((ts = c.getGenericInterfaces()) != null) {
+                for (int i = 0; i < ts.length; ++i) {
+                    if (((t = ts[i]) instanceof ParameterizedType) &&
+                            ((p = (ParameterizedType) t).getRawType() ==
+                                    Comparable.class) &&
+                            (as = p.getActualTypeArguments()) != null &&
+                            as.length == 1 && as[0] == c) // type arg is c
+                        return c;
+                }
+            }
+        }
+        return null;
+    }
+
+
+    /**
+     * Returns k.compareTo(x) if x matches kc (k's screened comparable
+     * class), else 0.
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"}) // for cast to Comparable
+    static int compareComparables(Class<?> kc, Object k, Object x) {
+        return (x == null || x.getClass() != kc ? 0 :
+                ((Comparable) k).compareTo(x));
+    }
+
 
     /*
      * The following package-protected methods are designed to be

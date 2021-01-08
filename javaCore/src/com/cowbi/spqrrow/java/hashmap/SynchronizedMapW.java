@@ -1,4 +1,4 @@
-package com.cowbi.spqrrow.java;
+package com.cowbi.spqrrow.java.hashmap;
 
 import java.io.Serializable;
 import java.util.*;
