@@ -145,7 +145,7 @@ button.addItemListener(e -> e.getItem());
 
    上面的3个例子是我们在开发过程中最常见的，从中也能体会到Lambda带来的便捷与清爽。它只保留实际用到的代码，把无用代码全部省略。那它对接口有没有要求呢？我们发现这些匿名内部类只重写了接口的一个方法，当然也只有一个方法须要重写。这里需要引入一个概念：
 
-   
+   **函数式接口-functional interface**，也称SAM接口，即Single Abstract Method interfaces，有且只有一个抽象方法，对static和default方法不做限制。
 
    刚才涉及到的接口都属于函数式接口，只有函数式接口才能被lambda替代。很多函数式接口都有@FunctionalInterface注解，当然也有没有的。刚用到的Comparator、Runnable就有，而ItemListener没有。不管有没有都必须符合函数式接口的定义。@FunctionalInterface注解只是强制规定接口必须符合函数式接口的定义，否则会编译错误。java还提供了一个函数式编程的包`java.util.function`，该包下的所有接口都有@FunctionalInterface注解，也就是都可以用Lambda表达式。
 
@@ -241,5 +241,106 @@ Collections.sort(strings, (Integer o1, Integer o2) -> o1 - i);
 
 lambda表达式可以引用外边变量，但是该变量默认拥有final属性，不能被修改，如果修改，编译时就报错。
 
-## StreamAPI
+## java.util.stream
 
+java新增了java.util.stream包，它和之前流的概念大同小异。之前接触最多的是资源流，比如`java.io.FileInputStream`，通过流把文件从一个地方输入到另一个地方，它只是内容搬运工，对文件内容不做任何*CRUD*。但`Stream`可以检索(Retrieve)、包括筛选、排序、统计、计数等。可以想象成是Sql的查询语句。
+
+它的源数据可以是Collection、Array、IO。由于它的方法参数都是函数式接口类型，所以一般和Lambda配合使用。
+
+接下来我们看`java.util.stream.Stream`常用方法
+
+```java
+/**
+* 过滤，返回由与给定predicate匹配的该流的元素组成的流
+*/
+Stream<T> filter(Predicate<? super T> predicate);
+
+/**
+* 此流的所有元素是否与提供的predicate匹配。
+*/
+boolean allMatch(Predicate<? super T> predicate)
+
+/**
+* 此流任意元素是否有与提供的predicate匹配。
+*/  
+boolean anyMatch(Predicate<? super T> predicate);
+
+/**
+* 返回一个 Stream的构建器。
+*/
+public static<T> Builder<T> builder();
+
+/**
+* 使用 Collector对此流的元素执行 mutable reduction Collector
+*/ 
+<R, A> R collect(Collector<? super T, A, R> collector);
+
+/**
+ * 返回此流中的元素数。
+*/
+long count();
+
+/**
+* 返回由该流的不同元素（根据 Object.equals(Object) ）组成的流。
+*/
+Stream<T> distinct();
+
+/**
+ * 遍历
+*/
+void forEach(Consumer<? super T> action);
+
+/**
+* 用于获取指定数量的流，截短长度不能超过 maxSize 。
+*/
+Stream<T> limit(long maxSize);
+
+/**
+* 用于映射每个元素到对应的结果
+*/
+<R> Stream<R> map(Function<? super T, ? extends R> mapper);
+
+/**
+* 根据提供的 Comparator进行排序。
+*/
+Stream<T> sorted(Comparator<? super T> comparator);
+
+/**
+* 在丢弃流的第一个 n元素后，返回由该流的 n元素组成的流。
+*/
+Stream<T> skip(long n);
+
+/**
+* 返回一个包含此流的元素的数组。
+*/
+Object[] toArray();
+
+/**
+* 使用提供的 generator函数返回一个包含此流的元素的数组，以分配返回的数组，以及分区执行或调整大小可能需要的任何其他数组。
+*/
+<A> A[] toArray(IntFunction<A[]> generator);
+```
+
+实战
+
+```java
+
+@Test
+public void filter(){
+  //数组
+	List<String> strings = Arrays.asList("abc", "def", "gkh","abc");
+	//filer返回符合条见的stream
+	Stream<String> stringStream =  strings.stream().filter(s -> "abc".equals(s));
+	//count计算流符合条件的流的数量
+  long count = stringStream.count();
+  
+  
+}
+```
+
+总结：
+
+1. 所有方法返回的Stream都是新流@return the new stream
+2. 方法参数都是函数式接口类型
+3. Stream只能操作一次
+4. Stream并不能直接获取到里面的内容。只能将其转换成人类能识别的内容。比如转换成数组，统计出一个结果等。
