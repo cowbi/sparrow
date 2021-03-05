@@ -2,7 +2,7 @@
 
 ## 是什么
 
-ThreadLocal从名字上看好像是一个Thread，其实并不是，它是Therad的局部变量的维护类。作用是让变量私有化（为每个Thread提供变量的副本），以此来实现线程间变量的隔离。比如有一个变量`count`，在多线程并发时操作`count++`会出现线程安全问题。但是通过ThreadLocal<Integer> count，就可以为每个线程创建只属于当前线程的count副本，各自操作各自的副本，不会影响到其他线程。我们先有个概念，具体还是看源码（JDK1.8）。
+ThreadLocal从名字上看好像是一个Thread，其实并不是，它是Thread的局部变量的维护类。作用是让变量私有化（为每个Thread提供变量的副本），以此来实现线程间变量的隔离。比如有一个变量`count`，在多线程并发时操作`count++`会出现线程安全问题。但是通过ThreadLocal<Integer> count，就可以为每个线程创建只属于当前线程的count副本，各自操作各自的副本，不会影响到其他线程。我们先有个概念，具体还是看源码（JDK1.8）。
 
 ## 原理源码
 
@@ -69,7 +69,7 @@ public static void main(String[] args) {
 
 1. **再哈希法**：如果hash出的index已经有值，就再hash，不行继续hash，直至找到空的index位置。
 
-2. **开放地址法：**如果hash出的index已经有值，通过算法在它前面或后面的若干位置寻找空位。
+2. **开放地址法**：如果hash出的index已经有值，通过算法在它前面或后面的若干位置寻找空位。
 
 3. **建立公共溢出区：** 把冲突的hash值放到另外一块溢出区。
 
@@ -331,8 +331,8 @@ private static final int HASH_INCREMENT = 0x61c88647;
 
    ThreadLocal使用不当可能会出现**内存泄露**，进而可能导致内存溢出**，
 
-   1. **内存泄露**：垃圾对象没有及时回收或无法回收，一般情况下是因为对象有错误的引用，导致内存浪费，这些垃圾越来越多可能会导致**内存溢出**，
-   2. **内存溢出**：没有足够的内存提供申请者使用。
+   1. **内存泄露（Memory Leak）**：垃圾对象没有及时回收或无法回收，一般情况下是因为对象有错误的引用，导致内存浪费，这些垃圾越来越多可能会导致**内存溢出**，
+   2. **内存溢出（OOM）**：没有足够的内存提供申请者使用。
 
    当然了，任何操作不当都会出现内存泄露或其他bug，我们这里只谈论ThreadLocal。
 
@@ -340,7 +340,7 @@ private static final int HASH_INCREMENT = 0x61c88647;
 
    1. Thread.threadLocals引用ThreadLocalMap，生命周期一致。
    2. ThreadLocal定义ThreadLocalMap
-   3. ThreadLocalMap#Entry弱引用ThreadLocal。我们通常说一个对象不被引用就会被gc回收，其实说的是强引用。但弱引用对象是，不管有没有被引用都会被垃圾回收。
+   3. ThreadLocalMap#Entry弱引用ThreadLocal。我们通常说一个对象不被引用就会被gc回收，其实说的是强引用。但弱引用对象是，GC时，不管有没有被引用都会被垃圾回收。
 
    当一个Thread执行完，被销毁后，Thread.threadLocals指向的ThreadLocalMap实例也会随之变为垃圾，当然它里面存放的Entity也会被回收。这时是不会发生内存泄漏的。
 
@@ -353,7 +353,7 @@ private static final int HASH_INCREMENT = 0x61c88647;
 它的应用场景主要有
 
 1. 线程安全，包裹线程不安全的工具类，比如`java.text.SimpleDateFormat`类，当然jdk1.8已经给出了对应的线程安全的类`java.time.format.DateTimeFormatter`
-2. 线程隔离，比如数据库连接管理、Session管理、mdc日志追踪等。
+2. 线程隔离，比如数据库连接管理、申明式事物、Session管理、mdc日志追踪等。
 
 最近在与前端对接的接口中用到了ThreadLocal。大概流程是，前端在请求后端接口时在header带上toekn，拦截器通过token获取到用户信息，通过ThreadLocal保存。主要代码如下：
 
